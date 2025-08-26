@@ -1,0 +1,188 @@
+## docker-compose version key is obsolete in v2; omitted on purpose
+
+# Complete OCR Web Application Stack
+# Includes: OCR Engine, Web API, Worker, Database, Redis, and optional monitoring
+
+services:
+  # Original OCR engine (keep your existing config)
+  olmocr:
+    image: alleninstituteforai/olmocr:latest
+    container_name: olmocr
+    stdin_open: true
+    tty: true
+    volumes:
+      - ./data:/app/data
+      - /path/to/your/certificate.crt:/etc/ssl/certs/corporate_ca.crt:ro
+    working_dir: /app/data
+    environment:
+      - REQUESTS_CA_BUNDLE=/etc/ssl/certs/corporate_ca.crt
+      - SSL_CERT_FILE=/etc/ssl/certs/corporate_ca.crt
+      - HF_HUB_CERTIFICATE=/etc/ssl/certs/corporate_ca.crt
+      - CURL_CA_BUNDLE=/etc/ssl/certs/corporate_ca.crt
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    command: /bin/bash
+    networks:
+      - ocr-network
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: ocr-postgres
+    environment:
+      POSTGRES_DB: ocr_db
+      POSTGRES_USER: ocr_user
+      POSTGRES_PASSWORD: ocr_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ocr_user -d ocr_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ocr-network
+
+  # Redis (Message Broker & Cache)
+  redis:
+    image: redis:7-alpine
+    container_name: ocr-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ocr-network
+
+  # FastAPI Web Server
+  api:
+    build: 
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: ocr-api
+    environment:
+      - DATABASE_URL=postgresql://ocr_user:ocr_password@postgres:5432/ocr_db
+      - REDIS_URL=redis://redis:6379/0
+      - DEBUG=true
+    volumes:
+      - ./data:/app/data
+      - ./web_app:/app/web_app
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - ocr-network
+
+  # Streamlit UI (Optional - simple frontend)
+  streamlit:
+    build:
+      context: .
+      dockerfile: Dockerfile.streamlit
+    container_name: ocr-streamlit
+    profiles:
+      - ui
+    environment:
+      - OLMOCR_API_URL=http://api:8000
+    volumes:
+      - ./streamlit_app.py:/app/streamlit_app.py:ro
+    ports:
+      - "8501:8501"
+    depends_on:
+      api:
+        condition: service_started
+    networks:
+      - ocr-network
+
+  # Celery Worker (OCR Processing)
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: ocr-worker
+    environment:
+      - DATABASE_URL=postgresql://ocr_user:ocr_password@postgres:5432/ocr_db
+      - REDIS_URL=redis://redis:6379/0
+      - C_FORCE_ROOT=1  # Allow Celery to run as root
+    volumes:
+      - ./data:/app/data
+      - ./web_app:/app/web_app
+      - /var/run/docker.sock:/var/run/docker.sock  # For docker-compose exec
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      olmocr:
+        condition: service_started
+    command: celery -A web_app.celery_app worker --loglevel=info --queues=ocr_queue
+    networks:
+      - ocr-network
+
+  # Celery Flower (Optional - Web-based monitoring)
+  flower:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: ocr-flower
+    profiles:
+      - monitoring
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - FLOWER_PORT=5555
+    ports:
+      - "5555:5555"
+    depends_on:
+      - redis
+    command: celery -A web_app.celery_app flower --port=5555
+    networks:
+      - ocr-network
+
+  # Nginx (Optional - Reverse proxy and static file serving)
+  nginx:
+    image: nginx:alpine
+    container_name: ocr-nginx
+    profiles:
+      - proxy
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./data/workspace:/var/www/static:ro
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - api
+    networks:
+      - ocr-network
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  ocr-network:
+    driver: bridge

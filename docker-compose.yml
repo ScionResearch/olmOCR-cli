@@ -1,0 +1,47 @@
+services:
+  olmocr:
+    # Use the official olmocr image from Docker Hub.
+    image: alleninstituteforai/olmocr:latest
+    container_name: olmocr
+    
+    # Keep STDIN open (-i) and allocate a pseudo-TTY (-t) for interactive use.
+    stdin_open: true
+    tty: true
+    
+    # Mount the local './data' directory into '/app/data' inside the container.
+    # Place your PDFs inside './data' on your host machine to access them.
+    # Output files will also be written back to this directory.
+    volumes:
+      - ./data:/app/data
+      # Mount corporate certificate for SSL/TLS verification
+      - /path/to/your/certificate.crt:/etc/ssl/certs/corporate_ca.crt:ro
+      
+    # Set the default working directory inside the container.
+    working_dir: /app/data
+
+    environment:
+      # Set environment variables if needed
+      #- PYTHONPATH=/workspace
+      # GPU settings
+      #- NVIDIA_VISIBLE_DEVICES=all
+      #- NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      # SSL/TLS Certificate Configuration for Python
+      - REQUESTS_CA_BUNDLE=/etc/ssl/certs/corporate_ca.crt
+      - SSL_CERT_FILE=/etc/ssl/certs/corporate_ca.crt
+      - HF_HUB_CERTIFICATE=/etc/ssl/certs/corporate_ca.crt
+      # Additional SSL environment variables for broader compatibility
+      - CURL_CA_BUNDLE=/etc/ssl/certs/corporate_ca.crt
+    
+    # Configure the container to use NVIDIA GPUs.
+    # This requires the NVIDIA Container Toolkit to be installed on the host.
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+              
+    # The default command starts an interactive bash shell inside the container.
+    # You can override this to run a command directly.
+    command: /bin/bash
