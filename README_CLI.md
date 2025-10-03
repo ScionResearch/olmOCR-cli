@@ -1,5 +1,14 @@
 # 🤖 AI-Powered OCR CLI Tool
 
+## Branch Structure
+
+This repository has two main branches:
+
+- **`main`** - Contains the core OLMoCR pipeline and CLI tool
+- **`webapp`** - Contains the web application with API, worker tasks, and Streamlit interface
+
+## About
+
 A premium, GUI-like command-line interface for the AI-powered OCR tool (OLMoCR) featuring real-time progress visualization, beautiful animations, and an intuitive user experience.
 
 ## Features
