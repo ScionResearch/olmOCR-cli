@@ -888,8 +888,8 @@ class OCRInterface:
             return
         
         # Output format selection
-        format_choice = input("\nOutput format (1=markdown, 2=json): ").strip()
-        output_format = "json" if format_choice == "2" else "markdown"
+        format_choice = input("\nOutput format (1=markdown, 2=default json): ").strip()
+        output_format = "markdown" if format_choice == "1" else "json"
         
         self.ensure_directories()
         success = self.process_pdfs(selected_files, output_format)
@@ -1061,7 +1061,7 @@ def main():
     parser.add_argument("--config", default="config.json", help="Configuration file path")
     parser.add_argument("--non-interactive", action="store_true", help="Run in non-interactive mode")
     parser.add_argument("--process", nargs="+", help="Process specific PDF files")
-    parser.add_argument("--format", choices=["markdown", "json"], default="markdown", help="Output format")
+    parser.add_argument("--format", choices=["markdown"], default="markdown", help="Output format (default: json if not specified)")
     
     args = parser.parse_args()
     
