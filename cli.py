@@ -49,8 +49,6 @@ class OCRConfig:
             "ssl_enabled": True,
             "show_logs": False
         }
-                    "data_directory": "./input",
-                    "workspace_directory": "./input/workspace",
         self.config = self.load_config()
     
     def load_config(self) -> Dict[str, Any]:
