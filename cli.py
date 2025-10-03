@@ -18,6 +18,30 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any
 import yaml
 from rich.console import Console
+def load_env_file(env_path: str = ".env") -> None:
+    """Load environment variables from .env file if it exists."""
+    env_file = Path(env_path)
+    if env_file.exists():
+        try:
+            with open(env_file, 'r') as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith('#') and '=' in line:
+                        key, value = line.split('=', 1)
+                        key = key.strip()
+                        value = value.strip()
+                        # Remove quotes if present
+                        if (value.startswith('"') and value.endswith('"')) or \
+                           (value.startswith("'") and value.endswith("'")):
+                            value = value[1:-1]
+                        # Only set if not already in environment
+                        if key not in os.environ:
+                            os.environ[key] = value
+        except Exception as e:
+            print(f"Warning: Could not load .env file: {e}")
+
+# Load .env file
+load_env_file()
 from rich.progress import Progress, BarColumn, TextColumn, TimeRemainingColumn, MofNCompleteColumn
 from rich.live import Live
 from rich.panel import Panel
@@ -32,8 +56,8 @@ import random
 class OCRConfig:
     """Configuration manager for OCR CLI settings."""
     
-    def __init__(self, config_path: str = "config.json"):
-        self.config_path = Path(config_path)
+    def __init__(self):
+        pass
         self.default_config = {
             "data_directory": "./data",
             "workspace_directory": "./data/workspace",
@@ -46,31 +70,51 @@ class OCRConfig:
             "auto_cleanup": True,
             "container_name": "olmocr",
             "ssl_cert_path": "/path/to/your/certificate.crt",
-            "ssl_enabled": True,
+            "ssl_enabled": False,
             "show_logs": False
         }
         self.config = self.load_config()
     
     def load_config(self) -> Dict[str, Any]:
-        """Load configuration from file or create default."""
-        if self.config_path.exists():
-            try:
-                with open(self.config_path, 'r') as f:
-                    config = json.load(f)
-                # Merge with defaults to ensure all keys exist
-                return {**self.default_config, **config}
-            except (json.JSONDecodeError, FileNotFoundError):
-                print(f"Warning: Could not load config from {self.config_path}, using defaults")
-        return self.default_config.copy()
+        """Load configuration from environment variables and .env file."""
+        config = self.default_config.copy()
+        
+        # Load from environment variables
+        env_mapping = {
+            "data_directory": "DATA_DIRECTORY",
+            "workspace_directory": "WORKSPACE_DIRECTORY", 
+            "docker_image": "DOCKER_IMAGE",
+            "output_format": "OUTPUT_FORMAT",
+            "gpu_enabled": "GPU_ENABLED",
+            "batch_size": "BATCH_SIZE",
+            "parallel_workers": "PARALLEL_WORKERS",
+            "debug_mode": "DEBUG_MODE",
+            "auto_cleanup": "AUTO_CLEANUP",
+            "container_name": "CONTAINER_NAME",
+            "ssl_cert_path": "SSL_CERT_PATH",
+            "ssl_enabled": "SSL_ENABLED",
+            "show_logs": "SHOW_LOGS"
+        }
+        
+        for config_key, env_key in env_mapping.items():
+            env_value = os.getenv(env_key)
+            if env_value is not None:
+                # Type conversion
+                if isinstance(config[config_key], bool):
+                    config[config_key] = env_value.lower() in ('true', '1', 'yes', 'on')
+                elif isinstance(config[config_key], int):
+                    try:
+                        config[config_key] = int(env_value)
+                    except ValueError:
+                        pass
+                else:
+                    config[config_key] = env_value
+        
+        return config
     
     def save_config(self) -> None:
-        """Save current configuration to file."""
-        try:
-            with open(self.config_path, 'w') as f:
-                json.dump(self.config, f, indent=2)
-            print(f"Configuration saved to {self.config_path}")
-        except Exception as e:
-            print(f"Error saving config: {e}")
+        """Configuration is managed via .env file - no action needed."""
+        print("Configuration is managed via .env file. Edit .env to change settings.")
     
     def get(self, key: str, default: Any = None) -> Any:
         """Get configuration value."""
@@ -177,19 +221,26 @@ class OCRInterface:
             result = subprocess.run(['docker', 'compose', 'version'], 
                                   capture_output=True, text=True, timeout=10)
             if result.returncode == 0:
-                # Check if docker-compose.yml exists
-                return Path("docker-compose.yml").exists()
+                # Check if appropriate docker-compose file exists
+                return self.get_compose_file().exists()
             
             # Fallback to Docker Compose V1 (docker-compose)
             result = subprocess.run(['docker-compose', '--version'], 
                                   capture_output=True, text=True, timeout=10)
             if result.returncode == 0:
-                # Check if docker-compose.yml exists
-                return Path("docker-compose.yml").exists()
+                # Check if appropriate docker-compose file exists
+                return self.get_compose_file().exists()
             
             return False
         except (subprocess.TimeoutExpired, FileNotFoundError):
             return False
+
+    def get_compose_file(self) -> Path:
+        """Get the appropriate docker-compose file based on SSL configuration."""
+        if self.config.get("ssl_enabled") and self.config.get("ssl_cert_path") and Path(self.config.get("ssl_cert_path")).exists():
+            return Path("docker-compose.ssl.yml")
+        else:
+            return Path("docker-compose.yml")
 
     def get_docker_compose_cmd(self) -> List[str]:
         """Get the appropriate docker compose command."""
@@ -210,10 +261,12 @@ class OCRInterface:
         # Prefer docker-compose if available (better for model caching)
         if self.check_docker_compose():
             compose_cmd = self.get_docker_compose_cmd()
-            cmd = compose_cmd + [
-                "exec", "-T", "olmocr",
+            compose_file = self.get_compose_file()
+            # Convert workspace path to container path (relative to /app/input)
+            container_workspace = "workspace"  # Inside container, workspace is just "workspace"
+            cmd = compose_cmd + ["-f", str(compose_file), "exec", "-T", "olmocr",
                 "python", "-m", "olmocr.pipeline", 
-                str(self.workspace_dir)
+                container_workspace
             ]
             # Only add --markdown flag if markdown is selected (json is default)
             if output_format == "markdown":
@@ -242,6 +295,8 @@ class OCRInterface:
             elif self.config.get("debug_mode"):
                 print(f"Warning: SSL certificate not found at {cert_path}")
         
+        # Convert workspace path to container path 
+        container_workspace = "workspace"  # Inside container, workspace is just "workspace"
         cmd = [
             "docker", "run", "--rm", "-it"
         ] + gpu_flag + [
@@ -251,7 +306,7 @@ class OCRInterface:
             "--name", self.config.get("container_name"),
             self.config.get("docker_image"),
             "python", "-m", "olmocr.pipeline", 
-            str(self.workspace_dir)
+            container_workspace
         ]
         # Only add --markdown flag if markdown is selected (json is default)
         if output_format == "markdown":
@@ -266,14 +321,19 @@ class OCRInterface:
             return True  # Skip if not using compose
         
         try:
+            # Set environment variables for docker-compose
+            env = os.environ.copy()
+            compose_file = self.get_compose_file()
+            
             # Check if container is running
             compose_cmd = self.get_docker_compose_cmd()
-            result = subprocess.run(compose_cmd + ['ps', '-q', 'olmocr'], 
-                                  capture_output=True, text=True)
+            result = subprocess.run(compose_cmd + ['-f', str(compose_file), 'ps', '-q', 'olmocr'], 
+                                  capture_output=True, text=True, env=env)
             if not result.stdout.strip():
-                print("Starting docker-compose container...")
-                start_result = subprocess.run(compose_cmd + ['up', '-d'], 
-                                            capture_output=True, text=True)
+                ssl_status = "with SSL" if compose_file.name == "docker-compose.ssl.yml" else "without SSL"
+                print(f"Starting docker-compose container ({ssl_status})...")
+                start_result = subprocess.run(compose_cmd + ['-f', str(compose_file), 'up', '-d'], 
+                                            capture_output=True, text=True, env=env)
                 if start_result.returncode != 0:
                     print(f"Failed to start container: {start_result.stderr}")
                     return False
@@ -1058,16 +1118,17 @@ https://github.com/allenai/olmocr
 def main():
     """Main entry point."""
     parser = argparse.ArgumentParser(description="Interactive CLI for AI-Powered OCR Tool")
-    parser.add_argument("--config", default="config.json", help="Configuration file path")
+    parser.add_argument("--config", default="config.json", help="[Deprecated] Use .env file instead")
     parser.add_argument("--non-interactive", action="store_true", help="Run in non-interactive mode")
     parser.add_argument("--process", nargs="+", help="Process specific PDF files")
     parser.add_argument("--format", choices=["markdown"], default="markdown", help="Output format (default: json if not specified)")
     
     args = parser.parse_args()
     
-    # Initialize CLI with custom config path if provided
+    # Initialize CLI
     cli = OCRInterface()
-    cli.config = OCRConfig(args.config)
+    if args.config != "config.json":  # If custom config specified, show message
+        print(f"Note: Configuration is now managed via .env file. --config parameter ignored.")
     
     if args.non_interactive:
         if args.process:

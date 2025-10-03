@@ -13,14 +13,18 @@ services:
     # Output files will also be written back to this directory.
     volumes:
       - ${DATA_DIRECTORY:-./data}:/app/input
-      # No SSL certificate mount (SSL disabled)
+      # Mount corporate certificate for SSL/TLS verification when SSL is enabled
+      - ${SSL_CERT_PATH}:/etc/ssl/certs/corporate_ca.crt:ro
       
     # Set the default working directory inside the container.
     working_dir: /app/input
 
     environment:
-      # No SSL environment variables (SSL disabled)
-      - PYTHONPATH=/app
+      # SSL/TLS Certificate Configuration - set when SSL_ENABLED=true
+      - REQUESTS_CA_BUNDLE=/etc/ssl/certs/corporate_ca.crt
+      - SSL_CERT_FILE=/etc/ssl/certs/corporate_ca.crt
+      - HF_HUB_CERTIFICATE=/etc/ssl/certs/corporate_ca.crt
+      - CURL_CA_BUNDLE=/etc/ssl/certs/corporate_ca.crt
     
     # Configure the container to use NVIDIA GPUs.
     # This requires the NVIDIA Container Toolkit to be installed on the host.
