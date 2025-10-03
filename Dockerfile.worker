@@ -17,11 +17,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY web_app/ ./web_app/
-COPY data/ ./data/
+COPY input/ ./input/
 COPY docker-compose.yml ./
 
 # Create necessary directories
-RUN mkdir -p data/uploads data/workspace
+RUN mkdir -p input/uploads input/workspace
 
 # Set environment variables for Celery
 ENV C_FORCE_ROOT=1

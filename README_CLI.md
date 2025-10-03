@@ -140,7 +140,7 @@ The CLI uses a `config.json` file to store settings:
 ```json
 {
   "data_directory": "./data",
-  "workspace_directory": "./workspace", 
+  "workspace_directory": "./data/workspace", 
   "docker_image": "alleninstituteforai/olmocr:latest",
   "output_format": "markdown",
   "gpu_enabled": true,
@@ -159,7 +159,7 @@ The CLI uses a `config.json` file to store settings:
 | Setting | Description | Default |
 |---------|-------------|---------|
 | `data_directory` | Directory containing PDF files | `./data` |
-| `workspace_directory` | Output directory for results | `./workspace` |
+| `workspace_directory` | Output directory for results | `./data/workspace` |
 | `docker_image` | Docker image to use | `alleninstituteforai/olmocr:latest` |
 | `output_format` | Default output format | `markdown` |
 | `gpu_enabled` | Enable GPU acceleration | `true` |

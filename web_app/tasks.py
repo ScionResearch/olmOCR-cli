@@ -43,29 +43,33 @@ def ocr_task(self, job_id: str, file_path: str, output_format: str = "markdown")
             raise FileNotFoundError(f"Input file not found: {file_path}")
         
         # Set up workspace directory
-        workspace_dir = Path("data/workspace")
+    workspace_dir = Path("input/workspace")
         workspace_dir.mkdir(exist_ok=True)
         
-        # Copy file to data directory for docker-compose access
-        data_dir = Path("data")
+    # Copy file to input directory for docker-compose access
+    data_dir = Path("input")
         pdf_filename = input_path.name.replace(f"{job_id}_", "")  # Remove job ID prefix
-        data_file_path = data_dir / pdf_filename
+    data_file_path = data_dir / pdf_filename
         
-        # Copy file to data directory
+    # Copy file to input directory
         import shutil
-        shutil.copy2(input_path, data_file_path)
+    shutil.copy2(input_path, data_file_path)
         
         # Build command to run pipeline inside the GPU-enabled 'olmocr' container.
         # Use docker exec against the named container to avoid compose context issues.
         cmd = [
             "docker", "exec", "-i",
-            "-w", "/app/data",
+            "-w", "/app/input",
             "olmocr",
             "python", "-m", "olmocr.pipeline",
-            "workspace",
-            f"--{output_format}",
-            "--pdfs", pdf_filename
+            "workspace"
         ]
+        
+        # Only add format flag for markdown (json is default)
+        if output_format == "markdown":
+            cmd.append("--markdown")
+        
+        cmd.extend(["--pdfs", pdf_filename])
         
         # Update job with processing status
         with get_db_session() as db:

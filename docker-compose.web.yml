@@ -11,9 +11,9 @@ services:
     stdin_open: true
     tty: true
     volumes:
-      - ./data:/app/data
+      - ./input:/app/input
       - /path/to/your/certificate.crt:/etc/ssl/certs/corporate_ca.crt:ro
-    working_dir: /app/data
+  working_dir: /app/input
     environment:
       - REQUESTS_CA_BUNDLE=/etc/ssl/certs/corporate_ca.crt
       - SSL_CERT_FILE=/etc/ssl/certs/corporate_ca.crt
@@ -79,7 +79,7 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - DEBUG=true
     volumes:
-      - ./data:/app/data
+      - ./input:/app/input
       - ./web_app:/app/web_app
     ports:
       - "8000:8000"
@@ -127,7 +127,7 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - C_FORCE_ROOT=1  # Allow Celery to run as root
     volumes:
-      - ./data:/app/data
+      - ./input:/app/input
       - ./web_app:/app/web_app
       - /var/run/docker.sock:/var/run/docker.sock  # For docker-compose exec
     depends_on:
@@ -168,7 +168,7 @@ services:
       - proxy
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./data/workspace:/var/www/static:ro
+      - ./input/workspace:/var/www/static:ro
     ports:
       - "80:80"
       - "443:443"

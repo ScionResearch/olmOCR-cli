@@ -8,16 +8,16 @@ services:
     stdin_open: true
     tty: true
     
-    # Mount the local './data' directory into '/app/data' inside the container.
-    # Place your PDFs inside './data' on your host machine to access them.
+    # Mount the local './input' directory into '/app/input' inside the container.
+    # Place your PDFs inside './input' on your host machine to access them.
     # Output files will also be written back to this directory.
     volumes:
-      - ./data:/app/data
+      - ./input:/app/input
       # Mount corporate certificate for SSL/TLS verification
       - /path/to/your/certificate.crt:/etc/ssl/certs/corporate_ca.crt:ro
       
     # Set the default working directory inside the container.
-    working_dir: /app/data
+    working_dir: /app/input
 
     environment:
       # Set environment variables if needed

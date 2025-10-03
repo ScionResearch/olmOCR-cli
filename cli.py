@@ -36,7 +36,7 @@ class OCRConfig:
         self.config_path = Path(config_path)
         self.default_config = {
             "data_directory": "./data",
-            "workspace_directory": "./workspace",
+            "workspace_directory": "./data/workspace",
             "docker_image": "alleninstituteforai/olmocr:latest",
             "output_format": "markdown",
             "gpu_enabled": True,
@@ -49,6 +49,8 @@ class OCRConfig:
             "ssl_enabled": True,
             "show_logs": False
         }
+                    "data_directory": "./input",
+                    "workspace_directory": "./input/workspace",
         self.config = self.load_config()
     
     def load_config(self) -> Dict[str, Any]:
@@ -213,10 +215,12 @@ class OCRInterface:
             cmd = compose_cmd + [
                 "exec", "-T", "olmocr",
                 "python", "-m", "olmocr.pipeline", 
-                str(self.workspace_dir), 
-                f"--{output_format}",
-                "--pdfs"
-            ] + pdfs
+                str(self.workspace_dir)
+            ]
+            # Only add --markdown flag if markdown is selected (json is default)
+            if output_format == "markdown":
+                cmd.append("--markdown")
+            cmd.extend(["--pdfs"] + pdfs)
             return cmd
         
         # Fallback to docker run (less efficient, downloads models each time)
@@ -249,10 +253,12 @@ class OCRInterface:
             "--name", self.config.get("container_name"),
             self.config.get("docker_image"),
             "python", "-m", "olmocr.pipeline", 
-            str(self.workspace_dir), 
-            f"--{output_format}",
-            "--pdfs"
-        ] + pdfs
+            str(self.workspace_dir)
+        ]
+        # Only add --markdown flag if markdown is selected (json is default)
+        if output_format == "markdown":
+            cmd.append("--markdown")
+        cmd.extend(["--pdfs"] + pdfs)
         
         return cmd
     

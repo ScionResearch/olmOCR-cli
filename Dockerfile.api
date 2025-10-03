@@ -15,10 +15,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY web_app/ ./web_app/
-COPY data/ ./data/
+COPY input/ ./input/
 
 # Create necessary directories
-RUN mkdir -p data/uploads data/workspace
+RUN mkdir -p input/uploads input/workspace
 
 # Expose port
 EXPOSE 8000

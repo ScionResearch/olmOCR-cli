@@ -36,7 +36,7 @@ app.add_middleware(
 )
 
 # Static files for serving results
-app.mount("/static", StaticFiles(directory="data/workspace"), name="static")
+app.mount("/static", StaticFiles(directory="input/workspace"), name="static")
 
 # Pydantic models for API requests/responses
 class JobCreate(BaseModel):
@@ -66,10 +66,10 @@ class JobList(BaseModel):
 async def startup_event():
     """Initialize database on startup."""
     create_tables()
-    # Ensure data directories exist
-    Path("data").mkdir(exist_ok=True)
-    Path("data/uploads").mkdir(exist_ok=True)
-    Path("data/workspace").mkdir(exist_ok=True)
+    # Ensure input directories exist
+    Path("input").mkdir(exist_ok=True)
+    Path("input/uploads").mkdir(exist_ok=True)
+    Path("input/workspace").mkdir(exist_ok=True)
 
 @app.get("/", tags=["Root"])
 async def root():
@@ -107,7 +107,7 @@ async def create_job(
     job_id = str(uuid.uuid4())
     
     # Save uploaded file
-    upload_path = Path("data/uploads") / f"{job_id}_{file.filename}"
+    upload_path = Path("input/uploads") / f"{job_id}_{file.filename}"
     
     try:
         with open(upload_path, "wb") as buffer:
