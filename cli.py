@@ -1120,20 +1120,39 @@ def main():
     parser = argparse.ArgumentParser(description="Interactive CLI for AI-Powered OCR Tool")
     parser.add_argument("--config", default="config.json", help="[Deprecated] Use .env file instead")
     parser.add_argument("--non-interactive", action="store_true", help="Run in non-interactive mode")
-    parser.add_argument("--process", nargs="+", help="Process specific PDF files")
+    parser.add_argument("--process", nargs="+", help="Process specific PDF files (supports glob patterns like '*.pdf')")
     parser.add_argument("--format", choices=["markdown"], default="markdown", help="Output format (default: json if not specified)")
-    
+
     args = parser.parse_args()
-    
+
     # Initialize CLI
     cli = OCRInterface()
     if args.config != "config.json":  # If custom config specified, show message
         print(f"Note: Configuration is now managed via .env file. --config parameter ignored.")
-    
+
     if args.non_interactive:
         if args.process:
             cli.ensure_directories()
-            success = cli.process_pdfs(args.process, args.format)
+
+            # Expand glob patterns in the --process argument
+            expanded_files = []
+            for pattern in args.process:
+                if '*' in pattern or '?' in pattern:
+                    # Glob pattern - expand it relative to data directory
+                    matched_files = list(cli.data_dir.glob(pattern))
+                    if matched_files:
+                        expanded_files.extend([f.name for f in matched_files])
+                    else:
+                        print(f"Warning: No files matched pattern '{pattern}'")
+                else:
+                    # Regular filename
+                    expanded_files.append(pattern)
+
+            if not expanded_files:
+                print("Error: No PDF files found matching the specified patterns")
+                sys.exit(1)
+
+            success = cli.process_pdfs(expanded_files, args.format)
             sys.exit(0 if success else 1)
         else:
             print("Non-interactive mode requires --process argument")
