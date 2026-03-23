@@ -102,8 +102,10 @@ Select option: _
 
 ## Quick Start
 
-1. **Install dependencies:**
+1. **Create virtual environment and install dependencies:**
    ```bash
+   python3 -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
    pip install -r requirements.txt
    ```
 
@@ -115,10 +117,26 @@ Select option: _
 
 3. **Run the CLI:**
    ```bash
+   source venv/bin/activate  # Activate venv if not already active
    python3 cli.py
    ```
 
 4. **Place PDF files in the data directory and process them through the interactive menu**
+
+### Web Upload Server
+
+For easy document uploads, use the web server:
+
+```bash
+# Quick start with auto-setup
+./start_webserver.sh
+
+# Or manually
+source venv/bin/activate
+python webserver.py
+```
+
+Then open http://localhost:5000 in your browser to upload documents.
 
 ## Usage Modes
 

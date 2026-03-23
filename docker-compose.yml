@@ -13,13 +13,17 @@ services:
     # Output files will also be written back to this directory.
     volumes:
       - ${DATA_DIRECTORY:-./data}:/app/input
-      # No SSL certificate mount (SSL disabled)
+      # Mount corporate certificate for SSL/TLS verification when SSL is enabled
+      - ${SSL_CERT_PATH}:/etc/ssl/certs/corporate_ca.crt:ro
       
     # Set the default working directory inside the container.
     working_dir: /app/input
 
     environment:
-      # No SSL environment variables (SSL disabled)
+      # SSL/TLS Certificate Configuration
+      - REQUESTS_CA_BUNDLE=/etc/ssl/certs/corporate_ca.crt
+      - SSL_CERT_FILE=/etc/ssl/certs/corporate_ca.crt
+      - CURL_CA_BUNDLE=/etc/ssl/certs/corporate_ca.crt
       - PYTHONPATH=/app
     
     # Configure the container to use NVIDIA GPUs.
@@ -34,4 +38,4 @@ services:
               
     # The default command starts an interactive bash shell inside the container.
     # You can override this to run a command directly.
-    command: /bin/bash
+    # command: /bin/bash
